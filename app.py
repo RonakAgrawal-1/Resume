@@ -3,11 +3,12 @@ import re
 from PyPDF2 import PdfReader
 from io import BytesIO
 import docx2txt
-from skills_keywords import skills_keywords
+from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse
 import pandas as pd
+from importlib import reload
+import skills_keywords  # Import the module
 
 # Function to extract the candidate's name from the resume
 def extract_candidate_name(text):
@@ -74,16 +75,10 @@ def extract_text_from_docx(uploaded_file):
         return {"error": str(e)}
 
 # Function to extract skills from the resume text
-# def extract_candidate_skills(text):
-#     try:
-#         skills = list(set([skill.lower().capitalize() for skill in skills_keywords if re.search(rf'\b{skill}\b', text, re.IGNORECASE)]))
-#         return skills
-#     except Exception as e:
-#         return {"error": str(e)}
 def extract_candidate_skills(text):
     try:
         extracted_skills = []
-        for skill in skills_keywords:
+        for skill in skills_keywords.skills_keywords:
             pattern = rf'\b{re.escape(skill)}\b'
             if re.search(pattern, text, re.IGNORECASE):
                 extracted_skills.append(skill.lower().capitalize())
@@ -92,17 +87,10 @@ def extract_candidate_skills(text):
         return {"error": str(e)}
 
 # Function to extract skills from the user-provided job description text
-# def extract_job_description_skills(job_description_text):
-#     try:
-#         skills = list(set([skill.lower().capitalize() for skill in skills_keywords if re.search(rf'\b{skill}\b', job_description_text, re.IGNORECASE)]))
-#         return skills
-#     except Exception as e:
-#         return {"error": str(e)}
-
 def extract_job_description_skills(job_description_text):
     try:
         extracted_skills = []
-        for skill in skills_keywords:
+        for skill in skills_keywords.skills_keywords:
             pattern = rf'\b{re.escape(skill)}\b'
             if re.search(pattern, job_description_text, re.IGNORECASE):
                 extracted_skills.append(skill.lower().capitalize())
@@ -121,6 +109,40 @@ def calculate_matching_score(candidate_skills, job_description_text):
         score = 0.0
 
     return score, common_skills
+
+# Function to append new skill keyword to the skills_keywords.py file
+def append_skill_keyword(new_skill):
+    try:
+        # Open the skills_keywords.py file in read mode
+        with open("skills_keywords.py", "r") as file:
+            lines = file.readlines()
+
+        # Find the line containing the skills_keywords list
+        for i, line in enumerate(lines):
+            if line.strip().startswith("skills_keywords = ["):
+                # Split the line into two parts: before and after the opening bracket
+                before_bracket = line[:line.index("[") + 1]
+                after_bracket = line[line.index("[") + 1:]
+
+                # Check if there are existing keywords inside the list
+                if len(after_bracket.strip()) > 1:
+                    # Add a comma and the new skill keyword to the existing list
+                    lines[i] = before_bracket + after_bracket.rstrip() + f' "{new_skill}",\n'
+                else:
+                    # Add the new skill keyword as the first item in the list
+                    lines[i] = before_bracket + f'"{new_skill}",\n'
+
+                break
+
+        # Write the modified lines back to the file
+        with open("skills_keywords.py", "w") as file:
+            file.writelines(lines)
+
+        # Reload the skills_keywords list to include the new skill
+        reload(skills_keywords)
+        return True
+    except Exception as e:
+        return str(e)
 
 # Set Streamlit page title and icon
 st.set_page_config(
@@ -141,6 +163,17 @@ uploaded_file = st.sidebar.file_uploader("Upload your resume (PDF or DOC/DOCX)")
 # Enter Job Description Section in Sidebar
 st.sidebar.subheader("Step 2: Enter Job Description")
 job_description_text = st.sidebar.text_area("Enter the job description")
+
+# Create a Streamlit sidebar input for adding skills keywords
+st.sidebar.title("Manage Skills Keywords")
+new_skill = st.sidebar.text_input("Enter a new skill keyword")
+
+# Button to add the new skill keyword
+if st.sidebar.button("Add Skill Keyword"):
+    if append_skill_keyword(new_skill):
+        st.success(f"Skill keyword '{new_skill}' added successfully!")
+    else:
+        st.warning("Failed to add the skill keyword. Please try again.")
 
 # Analyze Button in Sidebar
 if st.sidebar.button("Analyze"):
@@ -191,8 +224,6 @@ if st.sidebar.button("Analyze"):
                 else:
                     st.write("No common skills found between the job description and the candidate's skills.")
 
-            
-
             # GitHub Repositories and Technologies
             with col2:
                 st.subheader("GitHub Repositories and Technologies")
@@ -208,6 +239,7 @@ if st.sidebar.button("Analyze"):
                         for repo in user_repositories:
                             repo_name = repo.get("name", "")
                             repo_language = repo.get("language", "")
+
                             if repo_name:
                                 repo_data["Repository Name"].append(repo_name)
                             if repo_language:

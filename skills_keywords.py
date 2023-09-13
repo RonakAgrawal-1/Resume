@@ -10,7 +10,7 @@ skills_keywords = [
     "code optimization", "software documentation",
     "devops", "docker", "kubernetes", "continuous integration", "CI/CD", "git", "Jenkins",
     "Ansible", "Terraform", "Infrastructure as Code (IaC)", "Continuous Delivery",
-    "cloud computing", "AWS", "Azure", "Google Cloud", "Heroku", "AWS Lambda",
+    "cloud computing", "AWS", "Azure", "Google Cloud", "AWS Lambda",
     "serverless", "cloud-native", "cloud security", "cloud architecture", "microservices",
     "testing", "automation", "software testing", "Junit", "Selenium", "test strategy",
     "TDD", "BDD", "functional testing", "load testing",
