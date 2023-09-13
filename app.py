@@ -216,15 +216,15 @@ def create_matching_score_chart(score):
 
 # Set Streamlit page title and icon
 st.set_page_config(
-    page_title="Resume and GitHub Analyzer",
+    page_title="Intelligent Resume Analyzer",
     page_icon=":page_with_curl:"
 )
 
 # Introduction Section
-st.title("Welcome to the Resume and GitHub Profile Analyzer!")
+st.title("Welcome to the Intelligent Resume Analyzer!")
 
 # Create a sidebar for inputs
-st.sidebar.title("Resume and GitHub Analyzer")
+st.sidebar.title("Intelligent Resume Analyzer")
 
 # Upload Resume Section in Sidebar
 st.sidebar.subheader("Step 1: Upload Resume Files")

@@ -1,4 +1,4 @@
-skills_keywords = ["apple",
+skills_keywords = [
     "python", "java", "javascript", "c++", "c#", ".net", "ruby", "php",
     "html", "css", "javascript", "frontend development", "backend development",
     "full-stack development", "responsive design", "web services", "REST API",
