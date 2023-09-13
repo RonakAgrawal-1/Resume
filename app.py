@@ -5,54 +5,84 @@ from io import BytesIO
 import docx2txt
 from urllib.parse import urlparse
 import requests
-from bs4 import BeautifulSoup
 import pandas as pd
-from importlib import reload
-import skills_keywords  # Import the module
+from skills_keywords import skills_keywords
 
 # Function to extract the candidate's name from the resume
 def extract_candidate_name(text):
-    try:
-        name_pattern = r'\b[A-Z][a-zA-Z]* [A-Z][a-zA-Z]*\b'
-        candidate_name = re.search(name_pattern, text)
-        return candidate_name.group() if candidate_name else "Name not found"
-    except Exception as e:
-        return {"error": str(e)}
+    name_pattern = r'\b[A-Z][a-zA-Z]* [A-Z][a-zA-Z]*\b'
+    candidate_name = re.search(name_pattern, text)
+    return candidate_name.group() if candidate_name else "Name not found"
 
 # Function to extract GitHub link from the resume text
 def extract_github_link(text):
-    try:
-        # Search for GitHub link keywords in the text
-        github_keywords = ["github.com/", "https://github.com/"]
-        for keyword in github_keywords:
-            if keyword in text.lower():
-                start_index = text.lower().index(keyword)
-                end_index = text.find(" ", start_index)
-                github_link = text[start_index:end_index].strip()
-                return github_link
-
-        return "GitHub link not found"
-    except Exception as e:
-        return {"error": str(e)}
+    github_keywords = ["github.com/", "https://github.com/"]
+    for keyword in github_keywords:
+        if keyword in text.lower():
+            start_index = text.lower().index(keyword)
+            end_index = text.find(" ", start_index)
+            github_link = text[start_index:end_index].strip()
+            return github_link
+    return ""
 
 # Function to extract the GitHub username from the URL
 def extract_username_from_url(github_link):
     parsed_url = urlparse(github_link)
     if parsed_url.netloc == "github.com":
-        # Extract the username from the URL path
         path_parts = parsed_url.path.strip("/").split("/")
         if len(path_parts) >= 1:
             return path_parts[0]
     return None
 
 # Function to fetch user repositories
-def fetch_user_repositories(username):
-    url = f"https://api.github.com/users/{username}/repos"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        return []
+def fetch_user_repositories(github_link_or_gmail, resume_text):
+    username = extract_username_from_url(github_link_or_gmail)
+    
+    if username:
+        github_user_url = f"https://api.github.com/users/{username}/repos"
+        response = requests.get(github_user_url)
+        if response.status_code == 200:
+            return response.json()
+    
+    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
+    gmail_match = re.search(email_pattern, resume_text)
+    
+    if gmail_match:
+        gmail_address = gmail_match.group()
+        github_search_url = f"https://api.github.com/search/users?q={gmail_address}"
+        response = requests.get(github_search_url)
+        
+        if response.status_code == 200:
+            search_results = response.json()
+            
+            if "items" in search_results:
+                for item in search_results["items"]:
+                    repos_url = item.get("repos_url")
+                    
+                    if repos_url:
+                        repos_response = requests.get(repos_url)
+                        
+                        if repos_response.status_code == 200:
+                            return repos_response.json()
+    
+    if not username:
+        github_search_url = f"https://api.github.com/search/users?q={github_link_or_gmail.split('@')[0]}"
+        response = requests.get(github_search_url)
+        
+        if response.status_code == 200:
+            search_results = response.json()
+            
+            if "items" in search_results:
+                for item in search_results["items"]:
+                    repos_url = item.get("repos_url")
+                    
+                    if repos_url:
+                        repos_response = requests.get(repos_url)
+                        
+                        if repos_response.status_code == 200:
+                            return repos_response.json()
+    
+    return [{"name": "No repo found"}]
 
 # Function to extract text from a PDF file
 def extract_text_from_pdf(uploaded_file):
@@ -76,69 +106,54 @@ def extract_text_from_docx(uploaded_file):
 
 # Function to extract skills from the resume text
 def extract_candidate_skills(text):
-    try:
-        extracted_skills = []
-        for skill in skills_keywords.skills_keywords:
-            pattern = rf'\b{re.escape(skill)}\b'
-            if re.search(pattern, text, re.IGNORECASE):
-                extracted_skills.append(skill.lower().capitalize())
-        return extracted_skills
-    except Exception as e:
-        return {"error": str(e)}
+    extracted_skills = []
+    for skill in skills_keywords:
+        pattern = rf'\b{re.escape(skill)}\b'
+        if re.search(pattern, text, re.IGNORECASE):
+            extracted_skills.append(skill.lower().capitalize())
+    return extracted_skills
 
 # Function to extract skills from the user-provided job description text
 def extract_job_description_skills(job_description_text):
-    try:
-        extracted_skills = []
-        for skill in skills_keywords.skills_keywords:
-            pattern = rf'\b{re.escape(skill)}\b'
-            if re.search(pattern, job_description_text, re.IGNORECASE):
-                extracted_skills.append(skill.lower().capitalize())
-        return extracted_skills
-    except Exception as e:
-        return {"error": str(e)}
+    extracted_skills = []
+    for skill in skills_keywords:
+        pattern = rf'\b{re.escape(skill)}\b'
+        if re.search(pattern, job_description_text, re.IGNORECASE):
+            extracted_skills.append(skill.lower().capitalize())
+    return extracted_skills
 
 # Function to calculate the matching score based on skills
 def calculate_matching_score(candidate_skills, job_description_text):
     job_skills = extract_job_description_skills(job_description_text)
     common_skills = list(set(candidate_skills) & set(job_skills))
-
+    
     if job_skills:
         score = len(common_skills) / len(job_skills)
     else:
         score = 0.0
-
+    
     return score, common_skills
 
 # Function to append new skill keyword to the skills_keywords.py file
 def append_skill_keyword(new_skill):
     try:
-        # Open the skills_keywords.py file in read mode
         with open("skills_keywords.py", "r") as file:
             lines = file.readlines()
-
-        # Find the line containing the skills_keywords list
+        
         for i, line in enumerate(lines):
             if line.strip().startswith("skills_keywords = ["):
-                # Split the line into two parts: before and after the opening bracket
                 before_bracket = line[:line.index("[") + 1]
                 after_bracket = line[line.index("[") + 1:]
-
-                # Check if there are existing keywords inside the list
+                
                 if len(after_bracket.strip()) > 1:
-                    # Add a comma and the new skill keyword to the existing list
                     lines[i] = before_bracket + after_bracket.rstrip() + f' "{new_skill}",\n'
                 else:
-                    # Add the new skill keyword as the first item in the list
                     lines[i] = before_bracket + f'"{new_skill}",\n'
-
                 break
-
-        # Write the modified lines back to the file
+        
         with open("skills_keywords.py", "w") as file:
             file.writelines(lines)
-
-        # Reload the skills_keywords list to include the new skill
+        
         reload(skills_keywords)
         return True
     except Exception as e:
@@ -189,32 +204,42 @@ if st.sidebar.button("Analyze"):
             else:
                 st.error("Unsupported file format. Please upload a PDF or DOC/DOCX file.")
                 st.stop()
-
+            
             # Extract GitHub link from the candidate's resume text
             github_link = extract_github_link(resume_text)
-
+            
             # Calculate the matching score based on skills
-            score, common_skills = calculate_matching_score(extract_candidate_skills(resume_text), job_description_text)
-
+            candidate_skills = extract_candidate_skills(resume_text)
+            score, common_skills = calculate_matching_score(candidate_skills, job_description_text)
+            
             # Left Column (Name, GitHub Link, Common Skills, GitHub Repositories, Technologies)
             st.subheader("Candidate Information")
             col1, col2 = st.columns(2)
-
+            
             # Candidate Name
             with col1:
                 candidate_name = extract_candidate_name(resume_text)
                 st.write(f"Name: {candidate_name}")
-
+            
             # GitHub Link
             with col1:
-                if "error" in github_link:
-                    st.write(f"Error: {github_link['error']}")
-                else:
-                    # Check if the link is missing "https://" and add it if necessary
+                if github_link:
                     if not github_link.startswith("https://"):
                         github_link = "https://" + github_link
                     st.write(f"GitHub: [{github_link}]({github_link})")
-
+                else:
+                    st.write("No GitHub link found.")
+            
+            # Gmail Address
+            email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
+            gmail_match = re.search(email_pattern, resume_text)
+            with col1:
+                if gmail_match:
+                    gmail_address = gmail_match.group()
+                    st.write(f"Gmail: {gmail_address}")
+                else:
+                    st.write("No Gmail address found.")
+            
             # Common Skills
             with col1:
                 st.subheader("Common Skills with Job Description")
@@ -223,51 +248,40 @@ if st.sidebar.button("Analyze"):
                         st.write(f"- {skill}")
                 else:
                     st.write("No common skills found between the job description and the candidate's skills.")
-
+            
             # GitHub Repositories and Technologies
             with col2:
                 st.subheader("GitHub Repositories and Technologies")
-                username = extract_username_from_url(github_link)
-                if username:
-                    user_repositories = fetch_user_repositories(username)
-                    if user_repositories:
-                        repo_data = {
-                            "Repository Name": [],
-                            "Technologies Used": []
-                        }
-
-                        for repo in user_repositories:
-                            repo_name = repo.get("name", "")
-                            repo_language = repo.get("language", "")
-
-                            if repo_name:
-                                repo_data["Repository Name"].append(repo_name)
-                            if repo_language:
-                                repo_data["Technologies Used"].append(repo_language)
-
-                        # Ensure both lists have the same length
-                        max_length = max(len(repo_data["Repository Name"]), len(repo_data["Technologies Used"]))
-                        repo_data["Repository Name"] += [""] * (max_length - len(repo_data["Repository Name"]))
-                        repo_data["Technologies Used"] += [""] * (max_length - len(repo_data["Technologies Used"]))
-
-                        # Create a DataFrame for displaying repositories and technologies
-                        repo_df = pd.DataFrame(repo_data)
-
-                        st.write(repo_df)
-                    else:
-                        st.write(f"No repositories found for {github_link}.")
+                github_repositories = fetch_user_repositories(github_link, resume_text)
+                if github_repositories:
+                    repo_data = {
+                        "Repository Name": [],
+                        "Technologies Used": []
+                    }
+                    for repo in github_repositories:
+                        repo_name = repo.get("name", "")
+                        repo_language = repo.get("language", "")
+                        if repo_name:
+                            repo_data["Repository Name"].append(repo_name)
+                        if repo_language:
+                            repo_data["Technologies Used"].append(repo_language)
+                    
+                    max_length = max(len(repo_data["Repository Name"]), len(repo_data["Technologies Used"]))
+                    repo_data["Repository Name"] += [""] * (max_length - len(repo_data["Repository Name"]))
+                    repo_data["Technologies Used"] += [""] * (max_length - len(repo_data["Technologies Used"]))
+                    
+                    repo_df = pd.DataFrame(repo_data)
+                    st.write(repo_df)
                 else:
-                    st.write("Invalid GitHub profile link. Please check the link format.")
-
+                    st.write(f"No repositories found for {github_link}.")
+            
             # Right Column (Matching Score, All Skills)
             st.subheader("Matching Score and All Skills")
-            col3, col4, col5 = st.columns(3)  # Add a third column
-
+            col3, col4, col5 = st.columns(3)
+            
             # Matching Score
             with col3:
                 score_color = "green" if score >= 0.8 else "orange" if 0.5 <= score < 0.8 else "red"
-
-                # Create a circular progress bar for the matching score
                 st.markdown(
                     f'<div style="text-align: center;">'
                     f'<p style="font-size: 16px;">Matching Score</p>'
@@ -277,21 +291,16 @@ if st.sidebar.button("Analyze"):
                     f'</div>',
                     unsafe_allow_html=True
                 )
-
+            
             # All Skills
             with col4:
-                st.markdown(
-                    f'<div style="text-align: center;">'
-                    f'<p style="font-size: 16px;">All Skills</p>'
-                    f'</div>',
-                    unsafe_allow_html=True
-                )
+                st.subheader("Candidate Skills")
                 extracted_skills = extract_candidate_skills(resume_text)
                 if extracted_skills:
                     skills_text = ", ".join(extracted_skills)
                 else:
                     skills_text = "No skills found in the resume."
-
+            
                 st.markdown(
                     f'<p style="font-size: 14px;">{skills_text}</p>',
                     unsafe_allow_html=True
