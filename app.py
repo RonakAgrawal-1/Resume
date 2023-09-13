@@ -135,7 +135,6 @@ def calculate_matching_score(candidate_skills, job_description_text):
 
     return score, common_skills
 
-
 # Function to append new skill keyword to the skills_keywords.py file   
 def append_skill_keyword(new_skill):
     try:
@@ -161,6 +160,60 @@ def append_skill_keyword(new_skill):
     except Exception as e:
         return str(e)
 
+def sort_candidates_by_matching_score(candidate_data):
+    return sorted(candidate_data, key=lambda x: float(x["Matching Score"].strip('%')), reverse=True)
+
+def create_matching_score_chart(score):
+    percentage = int(score * 100)
+    color = "green" if percentage >= 70 else "orange" if percentage >= 30 else "red"
+    html_code = f"""
+    <div class="chart">
+        <div class="outer-circle">
+            <div class="inner-circle" style="background: conic-gradient({color} {percentage}%, transparent 0%);"></div>
+        </div>
+        <div class="score" style="color: {color};">{percentage}%</div>
+    </div>
+    <style>
+        .chart {{
+            display: inline-block;
+            width: 100px;
+            height: 100px;
+            position: relative;
+            border: 2px solid #f5f5f5;
+            border-radius: 50%;
+        }}
+        .outer-circle {{
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background-color: #f5f5f5;
+            position: relative;
+        }}
+        .inner-circle {{
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            position: absolute;
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+            animation: fillAnimation 2s linear forwards;
+        }}
+        .score {{
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            font-weight: bold;
+        }}
+        @keyframes fillAnimation {{
+            to {{
+                transform: rotate(360deg);
+            }}
+        }}
+    </style>
+    """
+    return html_code
+
 # Set Streamlit page title and icon
 st.set_page_config(
     page_title="Resume and GitHub Analyzer",
@@ -185,7 +238,7 @@ job_description_text = st.sidebar.text_area("Enter the job description")
 
 # Display results for each candidate
 if uploaded_files:
-    # Create a DataFrame to store candidate information (name, matching score)
+    # Create a DataFrame to store candidate information (name, matching score, details)
     candidate_data = []
 
     for uploaded_file in uploaded_files:
@@ -204,31 +257,54 @@ if uploaded_files:
 
         # Append candidate information to the DataFrame
         candidate_name = extract_candidate_name(resume_text)
-        candidate_data.append({"Name": candidate_name, "Matching Score": f"{int(score * 100)}%"})
+        candidate_data.append({
+            "Name": candidate_name,
+            "Matching Score": f"{int(score * 100)}%",
+            "Common Skills": common_skills,
+            "Skills": candidate_skills,
+            "Resume Text": resume_text
+        })
 
-        # Create an expandable section for the candidate details
-        with st.expander(f"Details for {candidate_name} (Matching Score: {int(score * 100)}%)"):
-            # Display common skills, all skills, GitHub repos, GitHub link, Gmail link, etc.
+    # Auto-sort candidate_data based on matching scores
+    candidate_data = sorted(candidate_data, key=lambda x: float(x["Matching Score"].strip('%')), reverse=True)
+
+    # Display candidates in a table-like dropdown
+
+    # Create a list of candidate names and matching scores
+    candidate_names = [candidate["Name"] for candidate in candidate_data]
+    matching_scores = [candidate["Matching Score"] for candidate in candidate_data]
+
+    # Create an empty list to store candidate details expanders
+    candidate_expanders = []
+
+    # Loop through the candidates and create expanders for each one
+    for candidate_name, matching_score in zip(candidate_names, matching_scores):
+        expander = st.expander(f"{candidate_name} (Matching Score: {matching_score})", expanded=False)
+        candidate_expanders.append(expander)
+
+    # Loop through sorted candidates and populate the expanders
+    for candidate, expander in zip(candidate_data, candidate_expanders):
+        with expander:
+            # Display common skills, skills, GitHub repos, GitHub link, Gmail link, etc.
             st.subheader("Common Skills with Job Description")
-            if common_skills:
-                for skill in common_skills:
+            if candidate["Common Skills"]:
+                for skill in candidate["Common Skills"]:
                     st.write(f"- {skill}")
             else:
                 st.write("No common skills found between the job description and the candidate's skills.")
 
-            st.subheader("Candidate Skills")
-            extracted_skills = extract_candidate_skills(resume_text)
-            if extracted_skills:
-                skills_text = ", ".join(extracted_skills)
+            st.subheader("Skills")
+            if candidate["Skills"]:
+                skills_text = ", ".join(candidate["Skills"])
             else:
                 skills_text = "No skills found in the resume."
             st.write(skills_text)
 
             # Fetch and display GitHub repositories and other details if available
             st.subheader("GitHub Repositories and Technologies")
-            github_link = extract_github_link(resume_text)
+            github_link = extract_github_link(candidate["Resume Text"])
             if github_link:
-                github_repositories = fetch_user_repositories(github_link, resume_text)
+                github_repositories = fetch_user_repositories(github_link, candidate["Resume Text"])
                 if github_repositories:
                     repo_data = {
                         "Repository Name": [],
@@ -254,14 +330,17 @@ if uploaded_files:
                 st.write("No GitHub link found.")
 
             # Display Gmail address if available
-            email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
-            gmail_match = re.search(email_pattern, resume_text)
+            gmail_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b', candidate["Resume Text"])
             if gmail_match:
                 gmail_address = gmail_match.group()
                 st.subheader("Gmail Address")
                 st.write(gmail_address)
             else:
                 st.write("No Gmail address found.")
+            # Display matching score as a circular chart
+            st.subheader("Matching Score")
+            matching_score_chart = create_matching_score_chart(float(candidate["Matching Score"].strip('%')) / 100)
+            st.markdown(matching_score_chart, unsafe_allow_html=True)
 else:
     st.warning("Please upload resume files.")
 
@@ -270,9 +349,8 @@ st.sidebar.title("Manage Skills Keywords")
 new_skill = st.sidebar.text_input("Enter a new skill keyword")
 
 # Button to add the new skill keyword
-if st.sidebar.button("Add Skill Keyword"):
+if st.sidebar.button("Add Skill Keyword", key="add_skill_button"):
     if append_skill_keyword(new_skill):
         st.success(f"Skill keyword '{new_skill}' added successfully!")
     else:
         st.warning("Failed to add the skill keyword. Please try again.")
-
