@@ -1,9 +1,9 @@
 import requests
 
 # Set your API credentials
-client_id = 'your_client_id'
-client_secret = 'your_client_secret'
-access_token = 'user_access_token'
+client_id = '77ikcdy2u28m4a'
+client_secret = '758MENYsZcFfIIqf'
+access_token = 'AQViphc6KAr5zIaYUPbYQu0wEUZim-eZf1qHvYfZ0ecZHNanPtQ2sVmAtlVDq6JwFbHZmA19GhXmTSZkO6okND45So3bX1jFzhBM3VB2djoK2DgylJ_hIZD25tYIHdJkWR68WxjHZQWsXm9okOHboRopLr9fN7X5vpJf00apTMZIKfWGmXLn1zfthlybQBF7CFoUINdavWEeT7HOAu90gEcIiC_--aInwcLV2CeLpTZuA8LNLf82_yMOVZB6WGAzar7x6FUYsUBjBkdIfq90lKE97HvfQPZ0lFqknmcdkFaoVPWDZXW4ORylLZJqGN7MRSSxuW2YXAEldee7P7WJIkS-ZhjMZg'
 
 # Define the API endpoint to retrieve a user's profile
 profile_url = 'https://api.linkedin.com/v2/me'
