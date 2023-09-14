@@ -1,1 +1,30 @@
-r
+import win32com.client as win32
+
+# Function to convert Word 97-2003 (.doc) files to DOCX
+def convert_doc_to_docx(uploaded_file):
+    try:
+        word = win32.gencache.EnsureDispatch("Word.Application")
+        doc = word.Documents.Open(uploaded_file.name)
+        docx_path = uploaded_file.name + "x"  # Create a DOCX file with the same name
+        doc.SaveAs(docx_path, FileFormat=16)  # FileFormat=16 corresponds to DOCX format
+        doc.Close()
+        return docx_path
+    except Exception as e:
+        return {"error": str(e)}
+
+# ...
+
+# Inside the loop for uploaded files, before processing:
+if uploaded_file.type == "application/pdf":
+    resume_text = extract_text_from_pdf(uploaded_file)
+elif uploaded_file.type in ["application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:
+    resume_text = extract_text_from_docx(uploaded_file)
+elif uploaded_file.type == "application/msword":  # Add this condition for DOC files
+    docx_file = convert_doc_to_docx(uploaded_file)
+    resume_text = extract_text_from_docx(docx_file)
+    os.remove(docx_file)  # Remove the temporary DOCX file after processing
+else:
+    st.warning(f"Skipping unsupported file: {uploaded_file.name}")
+    continue
+
+# ...
