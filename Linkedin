@@ -1,3 +1,45 @@
+# Function to extract total experience years from the resume text (numeric and textual)
+def extract_total_experience_years(resume_text):
+    # Define a list of patterns to search for total experience years
+    patterns = [
+        r"(\d+) years total experience",
+        r"total (\d+) years of experience",
+        r"total (\d+) years of IT experience",
+        r"(\d+) year total experience",
+        r"total (\d+) year of experience",
+        r"total (\d+) year of IT experience",
+        r"(\w+) years total experience",
+        r"total (\w+) years of experience",
+        r"total (\w+) years of IT experience",
+        r"(\w+) year",
+        r"(\w+) years",
+        r"(\d+) year",
+        r"(\w+) years"
+    ]
+
+    # Initialize a variable to store total experience years
+    total_experience_years = None
+
+    # Iterate through the patterns and search for the first match
+    for pattern in patterns:
+        matches = re.findall(pattern, resume_text, re.IGNORECASE)
+        if matches:
+            # Convert textual numbers to numeric values
+            total_experience_years = text_to_numeric(matches[0])
+            break  # Stop searching once the first match is found
+
+    return total_experience_years
+
+
+
+   # Loop through sorted candidates and populate the expanders
+    for candidate, expander in zip(candidate_data, candidate_expanders):
+        with expander:
+            # Display total experience years
+            total_experience_years = extract_total_experience_years(candidate["Resume Text"])
+            st.write(f"Total Experience Years: {total_experience_years} years")
+
+
 from urllib.parse import urlparse, urlunparse
 from linkedin import scrape_linkedin_bio
 
