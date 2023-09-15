@@ -1,0 +1,102 @@
+from urllib.parse import urlparse, urlunparse
+from linkedin import scrape_linkedin_bio
+
+# Function to extract the LinkedIn account from the resume text
+def extract_linkedin_account(text):
+    linkedin_pattern = r'(linkedin\.com\/[a-zA-Z0-9-_/]+)'
+    linkedin_match = re.search(linkedin_pattern, text, re.IGNORECASE)
+    if linkedin_match:
+        return linkedin_match.group(0)
+    else:
+        return None
+
+            # Display Gmail address if available
+            gmail_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b', candidate["Resume Text"])
+            if gmail_match:
+                gmail_address = gmail_match.group()
+                st.subheader("Gmail Address")
+                st.write(gmail_address)
+            else:
+                st.write("No Gmail address found.")
+            st.subheader("LinkedIn Account")
+            linkedin_account = extract_linkedin_account(candidate["Resume Text"])
+            if linkedin_account:
+                st.write(linkedin_account)
+                # Make an API call to scrape the LinkedIn bio
+                linkedin_bio = scrape_linkedin_bio(linkedin_account)
+                if linkedin_bio:
+                    st.subheader("LinkedIn Bio")
+                    st.write(linkedin_bio)
+                else:
+                    st.write("LinkedIn bio not available.")
+            else:
+                st.write("No LinkedIn account found.")
+            # Display matching score as a circular chart
+            st.subheader("Matching Score")
+            matching_score_chart = create_matching_score_chart(float(candidate["Matching Score"].strip('%')) / 100)
+            st.markdown(matching_score_chart, unsafe_allow_html=True)
+
+
+
+
+
+
+
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
+from config import linkedin_email, linkedin_password
+
+def scrape_linkedin_bio(profile_url):
+    # Prepend "https://" if it's not already present
+    if not profile_url.startswith("https://"):
+        profile_url = "https://" + profile_url
+
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')  # Enable headless mode
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--no-sandbox')
+
+    # Initialize Chrome WebDriver
+    driver = webdriver.Chrome(options=chrome_options)
+
+    driver.get('https://www.linkedin.com/login')
+
+    # Find the email and password fields by ID
+    email_field = driver.find_element(By.ID, 'username')
+    password_field = driver.find_element(By.ID, 'password')
+
+    email_field.send_keys(linkedin_email)  # Use the imported value
+    password_field.send_keys(linkedin_password)  # Use the imported value
+
+    sign_in_button = driver.find_element(By.XPATH, '//button[@type="submit"]')
+    sign_in_button.click()
+
+    time.sleep(2)
+
+    driver.get(profile_url)
+
+    try:
+        # Wait for the "About" section to become present
+        about_section = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CLASS_NAME, 'pv-shared-text-with-see-more'))
+        )
+
+        bio_text_element = about_section.find_element(By.XPATH, './/span')
+        bio_text = bio_text_element.text
+        driver.quit()
+        return bio_text
+    except Exception as e:
+        driver.quit()
+        return 'Bio section not found on the LinkedIn profile.'
+
+
+
+
+
+linkedin_email = "@gmail.com"
+linkedin_password = "@123"
